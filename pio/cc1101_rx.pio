@@ -1,0 +1,27 @@
+; pio/cc1101_rx.pio
+; PIO program to read data from CC1101 using its clock
+; Assumes:
+; - CC1101 GDO2 (CLK) is connected to this PIO's 'in' pin
+; - CC1101 GDO0 (DATA) is connected to this PIO's 'in' pin as well (we'll use side-set to select it)
+
+.program cc1101_rx
+
+.side_set 1 opt ; Use side-set for pin selection
+
+; This loop waits for the clock pin (base pin) to be high (idle state).
+; When it goes low, it starts reading bits on each rising edge.
+; The side-set value '0' or '1' is used to choose which pin (CLK or DATA) is read for the bit.
+
+.wrap_target
+    set x, 31             ; Loop 32 times to read 32 bits [1]
+    wait 1 pin 0          ; Wait for CLK (base pin) to be high
+    wait 0 pin 0          ; Wait for CLK to go low (start of bit)
+
+bitloop:
+    in pins, 1 side 0b1   ; On next instruction, sample DATA pin (side-set pin 1) and shift into ISR. Side-set '1' selects the second pin.
+    wait 1 pin 0          ; Wait for CLK to go high again
+    wait 0 pin 0          ; Wait for CLK to go low (prepare for next bit)
+    jmp x-- bitloop       ; Decrement x and loop if not zero
+
+    push noblock          ; Push the collected 32 bits to the RX FIFO
+.wrap
